@@ -1,0 +1,61 @@
+language: node_js
+node_js: lts/*
+
+env:
+  global:
+    - ELECTRON_CACHE=$HOME/.cache/electron
+    - ELECTRON_BUILDER_CACHE=$HOME/.cache/electron-builder
+
+before_cache:
+  - rm -rf $HOME/.cache/electron-builder/wine
+
+cache:
+  directories:
+    - node_modules
+    - $(npm config get prefix)/lib/node_modules
+    - $HOME/.cache/electron
+    - $HOME/.cache/electron-builder
+
+install:
+  - npm install
+stages:
+  - deploy
+script:
+  # Ideally we run `npm run package` here instead, but need to handle the
+  # complication of fetching the Wagerr binaries to place in the `bin` dir.
+  # Adding some `before_script` commands to each job to fetch the files from
+  # the latest GitHub release might be the solution.
+  - npm run package
+
+jobs:
+  include:
+    - stage: deploy
+      name: "mac"
+      os: osx
+    - stage: deploy
+      name: "linux"
+      os: linux
+    - stage: deploy
+      name: "windows"
+      os: windows
+
+before_deploy:
+  # Set up git user name and tag this commit
+  - git config --local user.name "sjhumili"
+  - git config --local user.email "sjkunai@outlook.com"
+  - export TRAVIS_TAG="$(node -p "require('./package.json').version")"
+  - git tag $TRAVIS_TAG
+  - echo $TRAVIS_TAG
+  - echo "deploying releases to GitHub releases $TRAVIS_TAG"
+deploy:
+  provider: releases
+  cleanup: true
+  api_key: 
+    secure: "dqy1OF2oqMkuP3FTIYKRy2YfavS3uETC7wVvbHjFUTqPnLAv0A/c520uHPNIXcD+CQADRRklLkhnW0niWuYg7Trqh93kQiTVrt8QFHKGgfdYxSZ6RHrb3D4kN1cfbgJuXNBGCiW3R+/oWvrSJ0O5vcaLtkvaPJJj+K+Uej7LsM4YmiT9sd9cN7Kx6E6MiPWcvUFqukG92reJbkbTuP9CSj9qrqAtwOoSN6FvMKnBGjB8j59knRa+FGOlmyncEMldYRPdRI2fq4zaGnqCRAb0IsCYVv15B9MPltxuDGW3MbGlJnwzY+86Y4VOCDO7fe3SU+UxpClbwlBWOS+ANFurKHhjj/TD3TbVzlvP7jnRuDGnJc9nRhTzPwDhtHpnxf2J6bKqIWSLnoEkO6lMm2BVmGFNVQqecZzVsIGxtI4fQ45gLLr47geXlfVWo23U/VF4NGjVUDN4a62Q8JvARewOp4XlcQs6ZZug8KkKsx2brcsFSeuPvbBPyy71POxrzP+9jgHLRbaf0wYJ5+hGAZkXs+PXKfnJZI9ikHHkSRbpC/wsEz8P7ywj9prhamtHjszPMiV1o8tW36Luz+BtspPWlPe57rD8yJcyagVAmEXCpesZldRXoH9ftqwNX+8F0DgVCCHUdXveye/42FZngKIn7zGVwmZuR9OQiI80uih5nD8="
+  file_glob: true
+  file:
+    - release/*.pkg
+    - release/*.deb
+    - release/nsis-web/*.exe
+  on:
+    branch: master
